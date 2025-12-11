@@ -2013,8 +2013,8 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
       setPoints: {
         name: "setPoints",
         info: {
-          en: "Replaces the entire point array with a new array",
-          de: "Ersetzt das gesamte Punktearray durch ein neues Array",
+          en: "Replaces the entire point array with a new array. If the path was closed, it will be automatically closed again.",
+          de: "Ersetzt das gesamte Punktearray durch ein neues Array. War der Pfad geschlossen, wird er automatisch erneut geschlossen.",
         },
         example: "setPoints([[0,0], [100,50], [200,100]])",
       },
@@ -2061,10 +2061,18 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
       closePath: {
         name: "closePath",
         info: {
-          en: "Closes the path by connecting the first and last point",
-          de: "Schließt den Pfad durch Verbindung des ersten und letzten Punktes",
+          en: "Closes the path by connecting the first and last point. The path remains closed after setPoints() calls.",
+          de: "Schließt den Pfad durch Verbindung des ersten und letzten Punktes. Der Pfad bleibt auch nach setPoints()-Aufrufen geschlossen.",
         },
         example: "closePath()",
+      },
+      openPath: {
+        name: "openPath",
+        info: {
+          en: "Opens a closed path by removing the closing point and disabling auto-close.",
+          de: "Öffnet einen geschlossenen Pfad, indem der Schließpunkt entfernt und Auto-Close deaktiviert wird.",
+        },
+        example: "openPath()",
       },
       onClick: {
         example:
@@ -2139,12 +2147,14 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
       },
     },
   };
+
   constructor(points = [], color = 0x000000, thickness = 2) {
     super();
     this.points = points;
     this._color = color;
     this._thickness = thickness;
     this._fillColor = null;
+    this._isClosed = false; // NEU: Flag für geschlossenen Zustand
     this._x = 0;
     this._y = 0;
     this.markedX = 0;
@@ -2179,93 +2189,178 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
     app.stage.addChild(this);
     Board[INSTANCE_KEY].addChild(this);
   }
+
   set x(value) {
     this._x = value;
     this.position.x = this._x;
   }
+
   get x() {
     return this._x;
   }
+
   set y(value) {
     this._y = value;
     this.position.y = this._y;
   }
+
   get y() {
     return this._y;
   }
+
   setFillColor(fillColor) {
     this._fillColor = fillColor;
     this._updateFill();
   }
+
   setAlpha(alpha) {
     this.alpha = Math.max(0, Math.min(1, alpha));
   }
+
   setPoints(newPoints) {
     this.points = [...newPoints];
-    this._rebuildSegments();
-  }
-  addPointEnd(x, y) {
-    this.points.push([x, y]);
-    if (this.points.length >= 2) {
-      this._addSegment(this.points.length - 2, this.points.length - 1);
+    // NEU: Wenn der Pfad geschlossen war, automatisch wieder schließen
+    if (this._isClosed) {
+      this._closePathInternal();
     }
-    this._updateFill();
-  }
-  addPointStart(x, y) {
-    this.points.unshift([x, y]);
     this._rebuildSegments();
   }
-  removePointEnd() {
-    if (this.points.length > 0) {
-      this.points.pop();
-      if (this.segments.length > 0) {
-        const lastSegment = this.segments.pop();
-        this.segmentsContainer.removeChild(lastSegment);
-        lastSegment.destroy();
+
+  addPointEnd(x, y) {
+    // Bei geschlossenem Pfad: Punkt vor dem Schließpunkt einfügen
+    if (this._isClosed && this.points.length >= 2) {
+      this.points.splice(this.points.length - 1, 0, [x, y]);
+      this._rebuildSegments();
+    } else {
+      this.points.push([x, y]);
+      if (this.points.length >= 2) {
+        this._addSegment(this.points.length - 2, this.points.length - 1);
       }
       this._updateFill();
     }
   }
+
+  addPointStart(x, y) {
+    this.points.unshift([x, y]);
+    // Bei geschlossenem Pfad: Schließpunkt aktualisieren
+    if (this._isClosed && this.points.length >= 2) {
+      this.points[this.points.length - 1] = [x, y];
+    }
+    this._rebuildSegments();
+  }
+
+  removePointEnd() {
+    if (this.points.length > 0) {
+      // Bei geschlossenem Pfad: Vorletzten Punkt entfernen
+      if (this._isClosed && this.points.length > 2) {
+        this.points.splice(this.points.length - 2, 1);
+        this._rebuildSegments();
+      } else if (!this._isClosed) {
+        this.points.pop();
+        if (this.segments.length > 0) {
+          const lastSegment = this.segments.pop();
+          this.segmentsContainer.removeChild(lastSegment);
+          lastSegment.destroy();
+        }
+        this._updateFill();
+      }
+    }
+  }
+
   removePointStart() {
     if (this.points.length > 0) {
       this.points.shift();
+      // Bei geschlossenem Pfad: Schließpunkt aktualisieren
+      if (this._isClosed && this.points.length >= 1) {
+        this.points[this.points.length - 1] = [this.points[0][0], this.points[0][1]];
+      }
       this._rebuildSegments();
     }
   }
+
   shiftX(deltaX) {
     this.segmentsContainer.x += deltaX;
     if (this.markerInitialized) {
       this.markAt(this.markedX - deltaX, this.markColor, this.markRadius);
     }
   }
-  closePath() {
+
+  // Interne Hilfsmethode zum Schließen (ohne Flag zu setzen)
+  _closePathInternal() {
     if (this.points.length < 2) return;
     const firstPoint = this.points[0];
     const lastPoint = this.points[this.points.length - 1];
-    if (firstPoint[0] === lastPoint[0] && firstPoint[1] === lastPoint[1]) {
-      return;
+    // Nur hinzufügen, wenn nicht bereits geschlossen
+    if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
+      this.points.push([firstPoint[0], firstPoint[1]]);
     }
-    this.addPointEnd(firstPoint[0], firstPoint[1]);
   }
+
+  closePath() {
+    if (this.points.length < 2) return;
+    if (this._isClosed) return; // Bereits geschlossen
+    
+    this._isClosed = true;
+    this._closePathInternal();
+    this._rebuildSegments();
+  }
+
+  openPath() {
+    if (!this._isClosed) return; // Bereits offen
+    if (this.points.length < 2) return;
+    
+    this._isClosed = false;
+    
+    // Entferne den Schließpunkt, falls vorhanden
+    const firstPoint = this.points[0];
+    const lastPoint = this.points[this.points.length - 1];
+    if (firstPoint[0] === lastPoint[0] && firstPoint[1] === lastPoint[1]) {
+      this.points.pop();
+    }
+    
+    this._rebuildSegments();
+  }
+
   addPoint(x, y) {
     this.addPointEnd(x, y);
   }
+
   removePoint(index) {
     if (index >= 0 && index < this.points.length) {
       this.points.splice(index, 1);
+      // Bei geschlossenem Pfad: Schließpunkt aktualisieren wenn nötig
+      if (this._isClosed && index === 0 && this.points.length >= 1) {
+        this.points[this.points.length - 1] = [this.points[0][0], this.points[0][1]];
+      }
       this._rebuildSegments();
     }
   }
+
   updatePoint(index, x, y) {
     if (index >= 0 && index < this.points.length) {
       this.points[index] = [x, y];
+      // Bei geschlossenem Pfad: Wenn erster Punkt geändert wird, auch letzten anpassen
+      if (this._isClosed) {
+        if (index === 0) {
+          this.points[this.points.length - 1] = [x, y];
+        } else if (index === this.points.length - 1) {
+          this.points[0] = [x, y];
+        }
+      }
       this._updateSegmentsForPoint(index);
       this._updateFill();
     }
   }
+
   updatePoints(newPoints) {
     this.setPoints(newPoints);
   }
+
+  // Getter für den geschlossenen Zustand
+  get isClosed() {
+    return this._isClosed;
+  }
+
   _rebuildSegments() {
     this._clearSegments();
     for (let i = 0; i < this.points.length - 1; i++) {
@@ -2273,6 +2368,7 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
     }
     this._updateFill();
   }
+
   _clearSegments() {
     this.segments.forEach((segment) => {
       this.segmentsContainer.removeChild(segment);
@@ -2280,6 +2376,7 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
     });
     this.segments = [];
   }
+
   _addSegment(startIndex, endIndex) {
     if (startIndex >= this.points.length || endIndex >= this.points.length)
       return;
@@ -2294,6 +2391,7 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
     this.segments.push(segment);
     this.segmentsContainer.addChild(segment);
   }
+
   _updateSegmentsForPoint(pointIndex) {
     if (pointIndex > 0) {
       this._updateSegment(pointIndex - 1, pointIndex - 1, pointIndex);
@@ -2302,6 +2400,7 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
       this._updateSegment(pointIndex, pointIndex, pointIndex + 1);
     }
   }
+
   _updateSegment(segmentIndex, startPointIndex, endPointIndex) {
     if (segmentIndex >= this.segments.length) return;
     const segment = this.segments[segmentIndex];
@@ -2314,6 +2413,7 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
     segment.lineTo(x2, y2);
     segment.endFill();
   }
+
   _updateFill() {
     this.fillGraphics.clear();
     if (this._fillColor !== null && this.points.length >= 3) {
@@ -2332,6 +2432,7 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
     }
     this.segmentsContainer.setChildIndex(this.fillGraphics, 0);
   }
+
   getY(x) {
     if (this.points.length < 2) return null;
     const adjustedX = x - this.segmentsContainer.x;
@@ -2352,6 +2453,7 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
     }
     return null;
   }
+
   markAt(x, color = null, radius = null) {
     this.markedX = x;
     if (color !== null) this.markColor = color;
@@ -2377,23 +2479,28 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
       this.hGuideLine.clear();
     }
   }
+
   removeMark() {
     this.markerInitialized = false;
     this.markedCircle.clear();
     this.vGuideLine.clear();
     this.hGuideLine.clear();
   }
+
   setColor(color) {
     this._color = color;
     this._rebuildSegments();
   }
+
   setThickness(thickness) {
     this._thickness = thickness;
     this._rebuildSegments();
   }
+
   set visible(isVisible) {
     this.alpha = isVisible ? 1 : 0;
   }
+
   get visible() {
     return this.alpha === 1;
   }
@@ -9350,14 +9457,6 @@ PixiJSEdu.SimplePNG = class SimplePNG extends PIXI.Container {
         },
         example: "setScale(1.5, 1.5)",
       },
-      setSize: {
-        name: "setSize",
-        info: {
-          en: "Sets the size of the image directly",
-          de: "Setzt die Größe des Bildes direkt",
-        },
-        example: "setSize(200, 150)",
-      },
       onClick: {
         example:
           'onClick(sendMessage); \n\nfunction sendMessage() { console.log("Hallo World"); }',
@@ -9489,15 +9588,6 @@ PixiJSEdu.SimplePNG = class SimplePNG extends PIXI.Container {
       this.sprite.scale.set(scaleX, scaleY);
       this._updateBorder();
     }
-  }
-  setSize(width, height) {
-    if (!this._originalDimensions) {
-      console.warn("Originaldimensionen noch nicht verfügbar");
-      return;
-    }
-    const scaleX = width / this._originalDimensions.width;
-    const scaleY = height / this._originalDimensions.height;
-    this.setScale(scaleX, scaleY);
   }
   getOriginalWidth() {
     return this._originalDimensions ? this._originalDimensions.width : 0;
