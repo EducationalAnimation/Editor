@@ -1,6 +1,6 @@
 /**
  * PixiJSEdu - Educational Animation Library
- * Version: 1.0.0
+ * Version: 1.0.2
  * Author: Sebastian Rikowski
  * License: GNU GPLv3
  *
@@ -4825,8 +4825,8 @@ PixiJSEdu.PointLabel = class PointLabel extends PIXI.Container {
           de: "Y-Koordinate des Referenzpunkts",
         },
       },
-      text: {
-        name: "text",
+      label: {
+        name: "label",
         info: {
           en: "Text to display as label (supports <sub> and <sup> tags)",
           de: "Text der als Beschriftung angezeigt wird (unterstützt <sub> und <sup> Tags)",
@@ -4846,8 +4846,8 @@ PixiJSEdu.PointLabel = class PointLabel extends PIXI.Container {
           de: "Vertikaler Versatz vom Referenzpunkt",
         },
       },
-      fontFamily: {
-        name: "fontFamily",
+      font: {
+        name: "font",
         info: {
           en: "Font family for the text",
           de: "Schriftart für den Text",
@@ -5050,10 +5050,10 @@ PixiJSEdu.PointLabel = class PointLabel extends PIXI.Container {
   constructor(
     pointX,
     pointY,
-    text,
+    label,
     offsetX = 10,
     offsetY = -10,
-    fontFamily = "Arial",
+    font = "Arial",
     fontSize = 12,
     textColor = 0x000000,
     backgroundColor = null,
@@ -5063,10 +5063,10 @@ PixiJSEdu.PointLabel = class PointLabel extends PIXI.Container {
 
     this._pointX = pointX;
     this._pointY = pointY;
-    this._text = text;
+    this._text = label;
     this._offsetX = offsetX;
     this._offsetY = offsetY;
-    this._fontFamily = fontFamily;
+    this._fontFamily = font;
     this._fontSize = fontSize;
     this._textColor = textColor;
     this._backgroundColor = backgroundColor;
@@ -5316,8 +5316,8 @@ PixiJSEdu.LineLabel = class LineLabel extends PIXI.Container {
           de: "Y-Koordinate des Endpunkts der Strecke",
         },
       },
-      text: {
-        name: "text",
+      label: {
+        name: "label",
         info: {
           en: "Text to display as label (supports <sub> and <sup> tags)",
           de: "Text der als Beschriftung angezeigt wird (unterstützt <sub> und <sup> Tags)",
@@ -5330,8 +5330,8 @@ PixiJSEdu.LineLabel = class LineLabel extends PIXI.Container {
           de: "Orthogonaler Abstand von der Strecke zur Beschriftung",
         },
       },
-      fontFamily: {
-        name: "fontFamily",
+      font: {
+        name: "font",
         info: {
           en: "Font family for the text",
           de: "Schriftart für den Text",
@@ -5494,9 +5494,9 @@ PixiJSEdu.LineLabel = class LineLabel extends PIXI.Container {
     startY,
     endX,
     endY,
-    text,
+    label,
     distance = 10,
-    fontFamily = "Arial",
+    font = "Arial",
     fontSize = 12,
     textColor = 0x000000,
     backgroundColor = null,
@@ -5508,9 +5508,9 @@ PixiJSEdu.LineLabel = class LineLabel extends PIXI.Container {
     this._startY = startY;
     this._endX = endX;
     this._endY = endY;
-    this._text = text;
+    this._text = label;
     this._distance = distance;
-    this._fontFamily = fontFamily;
+    this._fontFamily = font;
     this._fontSize = fontSize;
     this._textColor = textColor;
     this._backgroundColor = backgroundColor;
@@ -5854,15 +5854,15 @@ PixiJSEdu.AngleLabel = class AngleLabel extends PIXI.Container {
           de: "Radius des Kreisbogens",
         },
       },
-      text: {
-        name: "text",
+      label: {
+        name: "label",
         info: {
           en: "Text to display in the arc",
           de: "Text, der im Kreisbogen angezeigt wird",
         },
       },
-      fontFamily: {
-        name: "fontFamily",
+      font: {
+        name: "font",
         info: {
           en: "Font family for the text",
           de: "Schriftart für den Text",
@@ -6034,8 +6034,8 @@ PixiJSEdu.AngleLabel = class AngleLabel extends PIXI.Container {
     arm2X,
     arm2Y,
     radius,
-    text,
-    fontFamily = "Arial",
+    label,
+    font = "Arial",
     fontSize = 12,
     textColor = 0x444444,
     lineThickness = 1,
@@ -6049,8 +6049,8 @@ PixiJSEdu.AngleLabel = class AngleLabel extends PIXI.Container {
     this._arm2X = arm2X;
     this._arm2Y = arm2Y;
     this._radius = radius;
-    this._text = text;
-    this._fontFamily = fontFamily;
+    this._text = label;
+    this._fontFamily = font;
     this._fontSize = fontSize;
     this._textColor = textColor;
     this._lineThickness = lineThickness;
