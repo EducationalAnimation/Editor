@@ -1,6 +1,6 @@
 /**
  * HtmlSvgEdu - Educational Animation Library
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Sebastian Rikowski
  * License: GNU GPLv3
  *
@@ -81,7 +81,7 @@ HtmlSvgEdu.Component = class Component {
     uiContainer.appendChild(element);
     this._element = element;
     this._applyPosition();
-    Board[INSTANCE_KEY].addUIChild(this);
+    Board[INSTANCE_KEY].addChild(this);
     return element;
   }
   _createUiContainer() {
@@ -1063,8 +1063,22 @@ HtmlSvgEdu.RadioButton = class RadioButton extends HtmlSvgEdu.Component {
     }
   }
   _hexToCSS(hexColor) {
-    const hex = hexColor.toString(16).padStart(6, "0");
-    return "#" + hex;
+    // Falls bereits ein CSS-String (z.B. "#FF0000" oder "FF0000" oder "red")
+    if (typeof hexColor === "string") {
+      // Bereits gültiger CSS-Farbwert
+      if (hexColor.startsWith("#") || hexColor.startsWith("rgb") || /^[a-z]+$/i.test(hexColor)) {
+        return hexColor;
+      }
+      // Hex-String ohne # (z.B. "FF0000")
+      return "#" + hexColor;
+    }
+    // Falls eine Zahl (0xRRGGBB oder dezimal)
+    if (typeof hexColor === "number") {
+      const hex = hexColor.toString(16).padStart(6, "0");
+      return "#" + hex;
+    }
+    // Fallback: Schwarz
+    return "#000000";
   }
   _parseHtmlTags(text) {
     const parts = [];
@@ -1209,6 +1223,7 @@ HtmlSvgEdu.RadioButton = class RadioButton extends HtmlSvgEdu.Component {
       "http://www.w3.org/2000/svg",
       "style",
     );
+    // Textfarbe wird NICHT mehr in der CSS-Klasse gesetzt, sondern direkt am Element
     style.textContent =
       "/* RadioButton-Stil */" +
       ".radiobutton-container { cursor: pointer; }" +
@@ -1230,9 +1245,6 @@ HtmlSvgEdu.RadioButton = class RadioButton extends HtmlSvgEdu.Component {
       "font-size: " +
       this._fontSize +
       "px;" +
-      "fill: " +
-      this._cssTextColor +
-      ";" +
       "dominant-baseline: middle;" +
       "user-select: none;" +
       "}" +
@@ -1305,6 +1317,9 @@ HtmlSvgEdu.RadioButton = class RadioButton extends HtmlSvgEdu.Component {
       contentCenterY - totalTextHeight / 2 + textCenteringDelta;
     const browserStyles = this._getSubSupStyles();
 
+    // Speichere Referenzen auf die Text-Elemente für spätere Updates
+    this._textElements = [];
+
     lines.forEach((line, lineIndex) => {
       const textElement = document.createElementNS(
         "http://www.w3.org/2000/svg",
@@ -1321,6 +1336,9 @@ HtmlSvgEdu.RadioButton = class RadioButton extends HtmlSvgEdu.Component {
         ).toString(),
       );
       textElement.setAttribute("dominant-baseline", "middle");
+      // Textfarbe direkt als Attribut setzen (nicht über CSS-Klasse)
+      textElement.setAttribute("fill", this._cssTextColor);
+
       const parsedLine = this._parseHtmlTags(line);
       if (parsedLine.length === 1 && parsedLine[0].type === "normal") {
         textElement.textContent = parsedLine[0].text;
@@ -1366,6 +1384,7 @@ HtmlSvgEdu.RadioButton = class RadioButton extends HtmlSvgEdu.Component {
         });
       }
       this._radioButtonGroup.appendChild(textElement);
+      this._textElements.push(textElement);
     });
   }
   _setupEvents() {
@@ -1481,7 +1500,12 @@ HtmlSvgEdu.RadioButton = class RadioButton extends HtmlSvgEdu.Component {
   setTextColor(textColor) {
     this._textColor = textColor;
     this._cssTextColor = this._hexToCSS(textColor);
-    this._updateStyles();
+    // Textfarbe direkt auf den Text-Elementen aktualisieren
+    if (this._textElements) {
+      this._textElements.forEach((textElement) => {
+        textElement.setAttribute("fill", this._cssTextColor);
+      });
+    }
   }
   _updateStyles() {
     const oldStyle = this._svgElement.querySelector("style");
@@ -1912,28 +1936,20 @@ HtmlSvgEdu.NumericStepper = class NumericStepper extends HtmlSvgEdu.Component {
 HtmlSvgEdu.Dropdown = class Dropdown extends HtmlSvgEdu.Component {
   static serializationMap = {
     description: {
-      de: "Dropdown-Menü mit Auswahloptionen",
-      en: "Dropdown menu with selection options",
+      de: "Dropdown-Menü für die Auswahl aus einer Liste von Optionen",
+      en: "Dropdown menu for selecting from a list of options",
     },
     weblink: {
       de: "https://www.educational-animation.org",
       en: "https://www.educational-animation.org",
     },
-    example:
-      'let myDropdown = new Dropdown(["Option 1", "Option 2", "Option 3"], 0, 150);',
+    example: 'let myDropdown = new Dropdown(["Option 1", "Option 2"], 200, 40);',
     constructor: {
       options: {
         name: "options",
         info: {
-          en: "List of selectable options",
-          de: "Liste der auswählbaren Optionen",
-        },
-      },
-      selectedIndex: {
-        name: "selectedIndex",
-        info: {
-          en: "Index of the currently selected option",
-          de: "Index der aktuell ausgewählten Option",
+          en: "Array of options to display in the dropdown",
+          de: "Array von Optionen, die im Dropdown angezeigt werden",
         },
       },
       width: {
@@ -1941,6 +1957,13 @@ HtmlSvgEdu.Dropdown = class Dropdown extends HtmlSvgEdu.Component {
         info: {
           en: "Width of the element in pixels",
           de: "Breite des Elements in Pixeln",
+        },
+      },
+      height: {
+        name: "height",
+        info: {
+          en: "Height of the element in pixels",
+          de: "Höhe des Elements in Pixeln",
         },
       },
       font: {
@@ -1983,228 +2006,419 @@ HtmlSvgEdu.Dropdown = class Dropdown extends HtmlSvgEdu.Component {
         },
         example: "visible = true",
       },
+      selectedIndex: {
+        name: "selectedIndex",
+        info: {
+          en: "Index of the selected option",
+          de: "Index der ausgewählten Option",
+        },
+        example: "selectedIndex = 0",
+      },
     },
-    methods: {},
+    methods: {
+      onChange: {
+        name: "onChange",
+        info: {
+          en: "Registers a callback that is executed when the selection changes",
+          de: "Registriert einen Callback, der bei Änderung der Auswahl ausgeführt wird",
+        },
+        example:
+          'onChange(handleChange); \n\nfunction handleChange(event) { console.log("Selected: " + event.detail.value); }',
+      },
+      getSelectedValue: {
+        name: "getSelectedValue",
+        info: {
+          en: "Returns the currently selected value",
+          de: "Gibt den aktuell ausgewählten Wert zurück",
+        },
+        example: 'getSelectedValue();',
+      },
+      setOptions: {
+        name: "setOptions",
+        info: {
+          en: "Updates the list of available options",
+          de: "Aktualisiert die Liste der verfügbaren Optionen",
+        },
+        example: 'setOptions(["New Option 1", "New Option 2", "New Option 3"])',
+      },
+    },
   };
-  constructor(options, selectedIndex, width, font, fontSize) {
+  
+  constructor(options, width, height, font, fontSize) {
     super();
     this._options = options || [];
-    this._selectedIndex = selectedIndex || 0;
-    this._width = width || 150;
+    this._width = width || 200;
+    this._height = height || 40;
     this._font = font || "Arial";
     this._fontSize = fontSize || 16;
+    this._selectedIndex = 0;
     this._isOpen = false;
-    this._select = this._createElement("select");
-    this._select.className = "pixi-html-ui pixi-dropdown-enhanced";
-    this._element = this._select;
-    this._applyEnhancedStyles();
+    
+    // Container erstellen
+    this._element = this._createElement("div");
+    this._element.className = "pixi-html-ui pixi-dropdown-container";
+    
+    // Hauptbutton erstellen (zeigt ausgewählten Wert)
+    this._buttonElement = document.createElement("div");
+    this._buttonElement.className = "pixi-dropdown-button";
+    this._element.appendChild(this._buttonElement);
+    
+    // Text für ausgewählte Option
+    this._selectedText = document.createElement("span");
+    this._selectedText.className = "pixi-dropdown-text";
+    this._buttonElement.appendChild(this._selectedText);
+    
+    // Pfeil-Icon erstellen
+    this._arrowElement = document.createElement("div");
+    this._arrowElement.className = "pixi-dropdown-arrow";
+    this._arrowElement.innerHTML = this._createArrowSVG();
+    this._buttonElement.appendChild(this._arrowElement);
+    
+    // Options-Liste erstellen
+    this._listElement = document.createElement("div");
+    this._listElement.className = "pixi-dropdown-list";
+    this._element.appendChild(this._listElement);
+    
     this._populateOptions();
     this._applyStyles();
+    this._applyPosition();
     this._setupEvents();
+    this._updateSelectedText();
   }
-  _applyEnhancedStyles() {
-    if (!document.getElementById("pixi-dropdown-enhanced-styles")) {
+  
+  _createArrowSVG() {
+    // Berechne die SVG-Größe basierend auf der Schriftgröße
+    // Typischerweise 75% der Schriftgröße für gute Proportionen
+    const svgSize = Math.round(this._fontSize * 0.75);
+    
+    return `
+      <svg width="${svgSize}" height="${svgSize}" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 4.5 L6 7.5 L9 4.5" 
+              stroke="currentColor" 
+              stroke-width="1.5" 
+              fill="none" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"/>
+      </svg>
+    `;
+  }
+  
+  _populateOptions() {
+    if (!this._listElement) return;
+    this._listElement.innerHTML = "";
+    
+    this._options.forEach((option, index) => {
+      const optionElement = document.createElement("div");
+      optionElement.className = "pixi-dropdown-option";
+      optionElement.textContent = option;
+      optionElement.dataset.index = index;
+      
+      if (index === this._selectedIndex) {
+        optionElement.classList.add("selected");
+      }
+      
+      this._listElement.appendChild(optionElement);
+    });
+  }
+  
+  _applyStyles() {
+    if (!this._element) return;
+    
+    // Container-Styles
+    this._element.style.position = "absolute";
+    this._element.style.width = this._width + "px";
+    this._element.style.fontFamily = this._font;
+    this._element.style.fontSize = this._fontSize + "px";
+    
+    // Button-Styles
+    this._buttonElement.style.width = "100%";
+    this._buttonElement.style.height = this._height + "px";
+    this._buttonElement.style.background = "linear-gradient(to bottom, #fafafa, #efefef)";
+    this._buttonElement.style.border = "1px solid #aaaaaa";
+    this._buttonElement.style.borderRadius = "10px";
+    this._buttonElement.style.padding = "4px 8px";
+    this._buttonElement.style.cursor = "pointer";
+    this._buttonElement.style.display = "flex";
+    this._buttonElement.style.alignItems = "center";
+    this._buttonElement.style.justifyContent = "space-between";
+    this._buttonElement.style.transition = "all 0.2s";
+    this._buttonElement.style.boxSizing = "border-box";
+    this._buttonElement.style.userSelect = "none";
+    this._buttonElement.style.color = "#555";
+    
+    // Text-Styles
+    this._selectedText.style.flex = "1";
+    this._selectedText.style.overflow = "hidden";
+    this._selectedText.style.textOverflow = "ellipsis";
+    this._selectedText.style.whiteSpace = "nowrap";
+    
+    // Arrow-Styles
+    this._arrowElement.style.display = "flex";
+    this._arrowElement.style.alignItems = "center";
+    this._arrowElement.style.marginLeft = "8px";
+    this._arrowElement.style.transition = "transform 0.2s";
+    this._arrowElement.style.color = "#666";
+    
+    // List-Styles
+    this._listElement.style.position = "absolute";
+    this._listElement.style.top = (this._height + 2) + "px";
+    this._listElement.style.left = "0";
+    this._listElement.style.width = "100%";
+    this._listElement.style.maxHeight = "200px";
+    this._listElement.style.overflowY = "auto";
+    this._listElement.style.background = "white";
+    this._listElement.style.border = "1px solid #aaaaaa";
+    this._listElement.style.borderRadius = "4px";
+    this._listElement.style.boxShadow = "0 2px 4px rgba(0,0,0,0.1)";
+    this._listElement.style.display = "none";
+    this._listElement.style.zIndex = "1000";
+    
+    // Option-Styles via CSS-Regeln
+    const styleId = "pixi-dropdown-styles";
+    if (!document.getElementById(styleId)) {
       const style = document.createElement("style");
-      style.id = "pixi-dropdown-enhanced-styles";
-      style.textContent =
-        ".pixi-dropdown-enhanced {" +
-        "-webkit-appearance: none;" +
-        "-moz-appearance: none;" +
-        "appearance: none;" +
-        "padding: 10px 32px 10px 12px;" +
-        "border: 2px solid #ddd;" +
-        "border-radius: 4px;" +
-        "background-color: white;" +
-        "background-image: url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e\");" +
-        "background-position: right 8px center;" +
-        "background-repeat: no-repeat;" +
-        "background-size: 16px;" +
-        "cursor: pointer;" +
-        "box-sizing: border-box;" +
-        "outline: none;" +
-        "transition: all 0.2s ease;" +
-        "min-height: 20px;" +
-        "line-height: 1.2;" +
-        "height: auto;" +
-        "}" +
-        ".pixi-dropdown-enhanced:hover {" +
-        "border-color: #999;" +
-        "}" +
-        ".pixi-dropdown-enhanced:focus {" +
-        "border-color: #007bff;" +
-        "box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);" +
-        "}" +
-        "@-moz-document url-prefix() {" +
-        ".pixi-dropdown-enhanced {" +
-        "background-image: url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e\");" +
-        "padding: 10px 32px 10px 12px;" +
-        "min-height: 40px;" +
-        "}" +
-        "}" +
-        ".pixi-dropdown-enhanced::-ms-expand {" +
-        "display: none;" +
-        "}" +
-        ".pixi-dropdown-enhanced::-webkit-appearance {" +
-        "-webkit-appearance: none;" +
-        "}" +
-        ".pixi-dropdown-enhanced option {" +
-        "padding: 10px 12px;" +
-        "background-color: white;" +
-        "color: black;" +
-        "line-height: 1.2;" +
-        "height: auto;" +
-        "min-height: auto;" +
-        "width: 100%;" +
-        "box-sizing: border-box;" +
-        "}" +
-        ".pixi-dropdown-enhanced option:checked {" +
-        "background-color: #007bff;" +
-        "color: white;" +
-        "}" +
-        ".pixi-dropdown-enhanced option:hover {" +
-        "background-color: #f8f9fa;" +
-        "}" +
-        "@media screen and (-webkit-min-device-pixel-ratio:0) {" +
-        ".pixi-dropdown-enhanced option {" +
-        "width: 100%;" +
-        "min-width: 100%;" +
-        "font-size: inherit !important;" +
-        "}" +
-        "}" +
-        "@-moz-document url-prefix() {" +
-        ".pixi-dropdown-enhanced option {" +
-        "width: 100%;" +
-        "min-width: 100%;" +
-        "font-size: inherit !important;" +
-        "}" +
-        "}" +
-        ".pixi-dropdown-enhanced option {" +
-        "font-size: 50% !important;" +
-        "}";
+      style.id = styleId;
+      style.textContent = `
+        .pixi-dropdown-option {
+          padding: 8px 12px !important;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          color: #555;
+          font-size: inherit !important;
+          font-family: inherit !important;
+          line-height: 1.5 !important;
+          font-weight: normal !important;
+          letter-spacing: normal !important;
+          text-transform: none !important;
+          box-sizing: border-box;
+          min-height: 36px;
+          height: auto !important;
+          display: flex;
+          align-items: center;
+        }
+        .pixi-dropdown-option:hover {
+          background-color: #f0f0f0;
+          padding: 8px 12px !important;
+          font-size: inherit !important;
+          line-height: 1.5 !important;
+        }
+        .pixi-dropdown-option.selected {
+          background-color: #e8f5e8;
+          background-image: none;
+          font-weight: normal !important;
+          font-size: inherit !important;
+          font-family: inherit !important;
+          line-height: 1.5 !important;
+          letter-spacing: normal !important;
+          text-transform: none !important;
+          padding: 8px 12px !important;
+          min-height: 36px;
+          height: auto !important;
+          box-sizing: border-box;
+        }
+        .pixi-dropdown-button:hover {
+          border-color: #228B22;
+          background: #ffffff;
+        }
+        .pixi-dropdown-button.open {
+          border-color: #228B22;
+        }
+        .pixi-dropdown-button.open .pixi-dropdown-arrow {
+          transform: rotate(180deg);
+        }
+      `;
       document.head.appendChild(style);
     }
   }
-  _populateOptions() {
-    if (!this._select) return;
-    while (this._select.firstChild) {
-      this._select.removeChild(this._select.firstChild);
-    }
-    this._options.forEach((optText, index) => {
-      const option = document.createElement("option");
-      option.value = index;
-      option.textContent = optText;
-      this._select.appendChild(option);
-    });
-    this._select.selectedIndex = this._selectedIndex;
-    this._applyOptionStyles();
+  
+  _applyPosition() {
+    if (!this._element) return;
+    this._element.style.left = this._x + "px";
+    this._element.style.top = this._y + "px";
   }
-  _applyStyles() {
-    if (!this._select) return;
-    this._select.style.width = this._width + "px";
-    this._select.style.fontFamily = this._font;
-    this._select.style.fontSize = this._fontSize + "px";
-    const calculatedHeight = this._fontSize + 20;
-    this._select.style.minHeight = Math.max(40, calculatedHeight) + "px";
-    this._select.style.height = "auto";
-    this._select.style.lineHeight = "1.2";
-    this._applyOptionStyles();
-  }
-  _applyOptionStyles() {
-    if (!this._select) return;
-    const optionFontSize = this._fontSize / 1.7;
-    const options = this._select.getElementsByTagName("option");
-    for (let i = 0; i < options.length; i++) {
-      options[i].style.fontFamily = this._font;
-      options[i].style.fontSize = optionFontSize + "px !important";
-      options[i].style.lineHeight = "1.2";
-      options[i].style.minHeight = this._fontSize + 4 + "px";
-      options[i].style.width = "100%";
-      options[i].style.minWidth = this._width + "px";
-      options[i].style.boxSizing = "border-box";
-      options[i].setAttribute(
-        "style",
-        options[i].getAttribute("style") +
-          "; font-size: " +
-          optionFontSize +
-          "px !important;",
-      );
-    }
-  }
+  
   _setupEvents() {
-    if (!this._select) return;
-    this._select.addEventListener("change", (e) => {
-      this._selectedIndex = this._select.selectedIndex;
-      const event = new CustomEvent("dropdown-change", {
-        detail: {
-          component: this,
-          selectedIndex: this._selectedIndex,
-          selectedValue: this._options[this._selectedIndex],
-        },
-      });
-      this._element.dispatchEvent(event);
+    if (!this._buttonElement || !this._listElement) return;
+    
+    // Button-Click Event
+    this._buttonElement.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this._toggleDropdown();
     });
-    this._select.addEventListener("keydown", (e) => {
-      switch (e.key) {
-        case "Enter":
-          break;
-        case "Escape":
-          this._select.blur();
-          break;
+    
+    // Option-Click Events
+    this._listElement.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (e.target.classList.contains("pixi-dropdown-option")) {
+        const index = parseInt(e.target.dataset.index);
+        this._selectOption(index);
       }
     });
+    
+    // Schließen bei Klick außerhalb
+    this._documentClickHandler = (e) => {
+      if (!this._element.contains(e.target)) {
+        this._closeDropdown();
+      }
+    };
+    
+    // Escape-Taste zum Schließen
+    this._keydownHandler = (e) => {
+      if (e.key === "Escape" && this._isOpen) {
+        this._closeDropdown();
+      }
+    };
+    
+    document.addEventListener("click", this._documentClickHandler);
+    document.addEventListener("keydown", this._keydownHandler);
   }
-  setOptions(options) {
-    this._options = options || [];
-    this._populateOptions();
-    if (this._selectedIndex >= this._options.length) {
-      this._selectedIndex = this._options.length > 0 ? 0 : -1;
-      this._select.selectedIndex = this._selectedIndex;
+  
+  _toggleDropdown() {
+    if (this._isOpen) {
+      this._closeDropdown();
+    } else {
+      this._openDropdown();
     }
   }
-  setSelectedIndex(index) {
+  
+  _openDropdown() {
+    this._isOpen = true;
+    this._listElement.style.display = "block";
+    this._buttonElement.classList.add("open");
+  }
+  
+  _closeDropdown() {
+    this._isOpen = false;
+    this._listElement.style.display = "none";
+    this._buttonElement.classList.remove("open");
+  }
+  
+  _selectOption(index) {
     if (index >= 0 && index < this._options.length) {
+      const oldIndex = this._selectedIndex;
       this._selectedIndex = index;
-      if (this._select) {
-        this._select.selectedIndex = index;
+      
+      // Update selected state
+      const options = this._listElement.querySelectorAll(".pixi-dropdown-option");
+      options.forEach((opt, i) => {
+        if (i === index) {
+          opt.classList.add("selected");
+        } else {
+          opt.classList.remove("selected");
+        }
+      });
+      
+      this._updateSelectedText();
+      this._closeDropdown();
+      
+      // Fire change event
+      if (oldIndex !== index) {
+        const customEvent = new CustomEvent("dropdown-change", {
+          detail: {
+            component: this,
+            index: this._selectedIndex,
+            value: this._options[this._selectedIndex],
+            oldIndex: oldIndex,
+            oldValue: this._options[oldIndex]
+          },
+        });
+        customEvent.selectedIndex = this._selectedIndex;
+        customEvent.selectedValue = this._options[this._selectedIndex];
+        this._element.dispatchEvent(customEvent);
       }
     }
   }
-  setFont(font) {
-    this._font = font || "Arial";
-    this._applyStyles();
-  }
-  setFontSize(fontSize) {
-    this._fontSize = fontSize || 16;
-    this._applyStyles();
-  }
-  setWidth(width) {
-    this._width = width || 150;
-    if (this._select) {
-      this._select.style.width = this._width + "px";
+  
+  _updateSelectedText() {
+    if (this._selectedText && this._options.length > 0) {
+      this._selectedText.textContent = this._options[this._selectedIndex] || "";
     }
   }
-  focus() {
-    if (this._select) {
-      this._select.focus();
+  
+  set x(value) {
+    this._x = value;
+    this._applyPosition();
+  }
+  
+  get x() {
+    return this._x;
+  }
+  
+  set y(value) {
+    this._y = value;
+    this._applyPosition();
+  }
+  
+  get y() {
+    return this._y;
+  }
+  
+  set visible(value) {
+    this._visible = value;
+    if (this._element) {
+      this._element.style.display = this._visible ? "block" : "none";
     }
   }
+  
+  get visible() {
+    return this._visible;
+  }
+  
+  set selectedIndex(value) {
+    if (value >= 0 && value < this._options.length) {
+      this._selectOption(value);
+    }
+  }
+  
   get selectedIndex() {
     return this._selectedIndex;
   }
-  get selectedValue() {
-    return this._selectedIndex >= 0 ? this._options[this._selectedIndex] : null;
+  
+  // Setter für fontSize hinzufügen, um dynamische Größenänderung zu ermöglichen
+  set fontSize(value) {
+    this._fontSize = value;
+    if (this._element) {
+      this._element.style.fontSize = this._fontSize + "px";
+    }
+    // Pfeil-SVG neu erstellen mit neuer Größe
+    if (this._arrowElement) {
+      this._arrowElement.innerHTML = this._createArrowSVG();
+    }
   }
-  get options() {
-    return [...this._options];
+  
+  get fontSize() {
+    return this._fontSize;
   }
+  
+  getSelectedValue() {
+    return this._options[this._selectedIndex];
+  }
+  
+  setOptions(options) {
+    this._options = options;
+    this._selectedIndex = Math.min(this._selectedIndex, Math.max(0, options.length - 1));
+    this._populateOptions();
+    this._updateSelectedText();
+  }
+  
   onChange(callback) {
-    if (this._element && typeof callback === "function") {
+    if (this._element) {
       this._element.addEventListener("dropdown-change", callback);
     }
   }
-  removeChangeListener(callback) {
-    if (this._element && typeof callback === "function") {
-      this._element.removeEventListener("dropdown-change", callback);
+  
+  remove() {
+    // Event-Listener entfernen
+    if (this._documentClickHandler) {
+      document.removeEventListener("click", this._documentClickHandler);
+    }
+    if (this._keydownHandler) {
+      document.removeEventListener("keydown", this._keydownHandler);
+    }
+    
+    // Element entfernen
+    if (this._element && this._element.parentNode) {
+      this._element.parentNode.removeChild(this._element);
     }
   }
 };
@@ -4743,8 +4957,8 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
       parameters: {
         name: "parameters",
         info: {
-          en: 'Array of parameter objects with name and value [{name: "Parameter", value: 123}]',
-          de: 'Array von Parameter-Objekten mit Name und Wert [{name: "Parameter", value: 123}]',
+          en: 'Array of parameter objects with name and value [{name: "Parameter", value: 123}]. Names support HTML tags: <b>, <i>, <sub>, <sup>',
+          de: 'Array von Parameter-Objekten mit Name und Wert [{name: "Parameter", value: 123}]. Namen unterstützen HTML-Tags: <b>, <i>, <sub>, <sup>',
         },
       },
       width: {
@@ -4806,10 +5020,10 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
       setTitle: {
         name: "setTitle",
         info: {
-          en: "Sets the table title/header",
-          de: "Setzt die Tabellenüberschrift",
+          en: "Sets the table title/header. Supports HTML tags: <b>, <i>, <sub>, <sup>",
+          de: "Setzt die Tabellenüberschrift. Unterstützt HTML-Tags: <b>, <i>, <sub>, <sup>",
         },
-        example: 'setTitle("Configuration")',
+        example: 'setTitle("Configuration"); // or setTitle("v<sub>max</sub>")',
       },
       setValue: {
         name: "setValue",
@@ -4854,10 +5068,10 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
       addParameter: {
         name: "addParameter",
         info: {
-          en: "Adds a new parameter to the table",
-          de: "Fügt einen neuen Parameter zur Tabelle hinzu",
+          en: "Adds a new parameter to the table. Name supports HTML tags: <b>, <i>, <sub>, <sup>",
+          de: "Fügt einen neuen Parameter zur Tabelle hinzu. Name unterstützt HTML-Tags: <b>, <i>, <sub>, <sup>",
         },
-        example: 'addParameter("New Param", 0)',
+        example: 'addParameter("New Param", 0); // or addParameter("F<sub>res</sub>", 100)',
       },
       removeParameter: {
         name: "removeParameter",
@@ -5006,10 +5220,76 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
       this._createParameterRow(param, index);
     });
   }
+  
+  // Neue Methode zum sicheren Parsen von HTML-Tags
+  _sanitizeAndParseHTML(text) {
+    // Erlaubte Tags definieren
+    const allowedTags = ['sub', 'sup', 'i', 'b'];
+    
+    // Erstelle ein temporäres Element zum Parsen
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = text;
+    
+    // Funktion zum rekursiven Säubern der Nodes
+    const sanitizeNode = (node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent;
+      }
+      
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const tagName = node.tagName.toLowerCase();
+        
+        if (allowedTags.includes(tagName)) {
+          // Erlaubter Tag - behalte ihn bei
+          const newElement = document.createElement(tagName);
+          for (let child of node.childNodes) {
+            const sanitizedChild = sanitizeNode(child);
+            if (typeof sanitizedChild === 'string') {
+              newElement.appendChild(document.createTextNode(sanitizedChild));
+            } else {
+              newElement.appendChild(sanitizedChild);
+            }
+          }
+          return newElement;
+        } else {
+          // Nicht erlaubter Tag - nur den Textinhalt verwenden
+          return document.createTextNode(node.textContent);
+        }
+      }
+      
+      return '';
+    };
+    
+    // Säubere das temporäre Element
+    const fragment = document.createDocumentFragment();
+    for (let child of tempDiv.childNodes) {
+      const sanitized = sanitizeNode(child);
+      if (typeof sanitized === 'string') {
+        fragment.appendChild(document.createTextNode(sanitized));
+      } else if (sanitized) {
+        fragment.appendChild(sanitized);
+      }
+    }
+    
+    return fragment;
+  }
+  
+  // Neue Methode zum Extrahieren des reinen Texts (ohne HTML-Tags)
+  _stripHTML(text) {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = text;
+    return tempDiv.textContent || tempDiv.innerText || '';
+  }
+  
   _createParameterRow(param, index) {
     const row = document.createElement("tr");
     const labelCell = document.createElement("th");
-    labelCell.textContent = param.name;
+    
+    // Verwende innerHTML mit bereinigtem HTML für die Bezeichnung
+    const sanitizedHTML = this._sanitizeAndParseHTML(param.name);
+    labelCell.innerHTML = ''; // Leere zuerst
+    labelCell.appendChild(sanitizedHTML);
+    
     row.appendChild(labelCell);
     const valueCell = document.createElement("td");
     const input = document.createElement("input");
@@ -5019,7 +5299,10 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
       param.name,
     );
     input.dataset.parameterIndex = index;
+    // Speichere sowohl den Original-Namen als auch den bereinigten Namen
     input.dataset.parameterName = param.name;
+    input.dataset.parameterNameClean = this._stripHTML(param.name);
+    
     input.addEventListener("input", (e) => this._handleInput(e));
     input.addEventListener("change", (e) => this._handleChange(e));
     input.addEventListener("blur", (e) => this._handleBlur(e));
@@ -5027,19 +5310,25 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
     row.appendChild(valueCell);
     this._tableBody.appendChild(row);
   }
+  
   _roundValue(value, parameterName) {
-    const rounding = this._rounding.has(parameterName)
-      ? this._rounding.get(parameterName)
+    // Verwende den bereinigten Namen für den Vergleich
+    const cleanName = this._stripHTML(parameterName);
+    const rounding = this._rounding.has(cleanName)
+      ? this._rounding.get(cleanName)
       : this._defaultRounding;
     if (rounding > 0) {
       return Math.round(value / rounding) * rounding;
     }
     return value;
   }
+  
   _formatValue(value, parameterName) {
+    // Verwende den bereinigten Namen für den Vergleich
+    const cleanName = parameterName ? this._stripHTML(parameterName) : '';
     const rounding =
-      parameterName && this._rounding.has(parameterName)
-        ? this._rounding.get(parameterName)
+      cleanName && this._rounding.has(cleanName)
+        ? this._rounding.get(cleanName)
         : this._defaultRounding;
     let decimals = 0;
     if (rounding < 1) {
@@ -5054,6 +5343,7 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
     }
     return formattedValue;
   }
+  
   _parseValue(valueStr) {
     if (typeof valueStr !== "string") {
       valueStr = String(valueStr);
@@ -5061,13 +5351,16 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
     const normalizedValue = valueStr.replace(",", ".");
     return parseFloat(normalizedValue);
   }
+  
   _handleInput(event) {
     const input = event.target;
     const parameterName = input.dataset.parameterName;
+    const cleanName = this._stripHTML(parameterName);
     const value = this._parseValue(input.value);
+    
     if (!isNaN(value)) {
-      if (this._valueLimits.has(parameterName)) {
-        const limits = this._valueLimits.get(parameterName);
+      if (this._valueLimits.has(cleanName)) {
+        const limits = this._valueLimits.get(cleanName);
         if (value < limits.min || value > limits.max) {
           input.classList.add("error");
         } else {
@@ -5084,21 +5377,25 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
       input.classList.add("error");
     }
   }
+  
   _handleChange(event) {
     const input = event.target;
     const parameterIndex = parseInt(input.dataset.parameterIndex);
     const parameterName = input.dataset.parameterName;
+    const cleanName = this._stripHTML(parameterName);
     const value = this._parseValue(input.value);
+    
     if (!isNaN(value)) {
       let finalValue = value;
-      if (this._valueLimits.has(parameterName)) {
-        const limits = this._valueLimits.get(parameterName);
+      if (this._valueLimits.has(cleanName)) {
+        const limits = this._valueLimits.get(cleanName);
         finalValue = Math.max(limits.min, Math.min(limits.max, value));
       }
       finalValue = this._roundValue(finalValue, parameterName);
       this._parameters[parameterIndex].value = finalValue;
       input.value = this._formatValue(finalValue, parameterName);
       input.classList.remove("error");
+      
       const customEvent = new CustomEvent("parameter-change", {
         detail: {
           component: this,
@@ -5119,6 +5416,7 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
       input.classList.remove("error");
     }
   }
+  
   _handleBlur(event) {
     const input = event.target;
     const parameterIndex = parseInt(input.dataset.parameterIndex);
@@ -5131,80 +5429,113 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
       input.classList.remove("error");
     }
   }
+  
   setTitle(title) {
     this._title = title;
     if (this._titleElement) {
       if (title) {
-        this._titleElement.textContent = title;
+        // Verwende sanitizeAndParseHTML auch für den Titel
+        this._titleElement.innerHTML = '';
+        this._titleElement.appendChild(this._sanitizeAndParseHTML(title));
         this._titleElement.style.display = "block";
       } else {
         this._titleElement.style.display = "none";
       }
     }
   }
+  
   setValue(parameterName, value) {
+    // Unterstütze sowohl den Original-Namen als auch den bereinigten Namen
     const paramIndex = this._parameters.findIndex(
-      (p) => p.name === parameterName,
+      (p) => p.name === parameterName || this._stripHTML(p.name) === parameterName
     );
+    
     if (paramIndex !== -1) {
+      const cleanName = this._stripHTML(this._parameters[paramIndex].name);
       let finalValue = value;
-      if (this._valueLimits.has(parameterName)) {
-        const limits = this._valueLimits.get(parameterName);
+      
+      if (this._valueLimits.has(cleanName)) {
+        const limits = this._valueLimits.get(cleanName);
         finalValue = Math.max(limits.min, Math.min(limits.max, value));
       }
-      finalValue = this._roundValue(finalValue, parameterName);
+      
+      finalValue = this._roundValue(finalValue, this._parameters[paramIndex].name);
       this._parameters[paramIndex].value = finalValue;
+      
+      // Suche das Input-Element mit beiden möglichen Selektoren
       const input = this._tableBody.querySelector(
-        'input[data-parameter-name="' + parameterName + '"]',
+        'input[data-parameter-name="' + this._parameters[paramIndex].name + '"]'
+      ) || this._tableBody.querySelector(
+        'input[data-parameter-name-clean="' + cleanName + '"]'
       );
+      
       if (input) {
-        input.value = this._formatValue(finalValue, parameterName);
+        input.value = this._formatValue(finalValue, this._parameters[paramIndex].name);
       }
     }
   }
+  
   getValue(parameterName) {
-    const param = this._parameters.find((p) => p.name === parameterName);
+    // Unterstütze sowohl den Original-Namen als auch den bereinigten Namen
+    const param = this._parameters.find(
+      (p) => p.name === parameterName || this._stripHTML(p.name) === parameterName
+    );
     return param ? param.value : null;
   }
+  
   setValueLimits(parameterName, min, max) {
-    this._valueLimits.set(parameterName, { min: min, max: max });
+    // Verwende den bereinigten Namen für die Map
+    const cleanName = this._stripHTML(parameterName);
+    this._valueLimits.set(cleanName, { min: min, max: max });
+    
     const paramIndex = this._parameters.findIndex(
-      (p) => p.name === parameterName,
+      (p) => p.name === parameterName || this._stripHTML(p.name) === parameterName
     );
+    
     if (paramIndex !== -1) {
       const currentValue = this._parameters[paramIndex].value;
       const limitedValue = Math.max(min, Math.min(max, currentValue));
       if (limitedValue !== currentValue) {
-        this.setValue(parameterName, limitedValue);
+        this.setValue(this._parameters[paramIndex].name, limitedValue);
       }
     }
   }
+  
   removeValueLimits(parameterName) {
-    this._valueLimits.delete(parameterName);
+    const cleanName = this._stripHTML(parameterName);
+    this._valueLimits.delete(cleanName);
   }
+  
   setRounding(parameterName, rounding) {
+    const cleanName = this._stripHTML(parameterName);
     if (rounding > 0) {
-      this._rounding.set(parameterName, rounding);
+      this._rounding.set(cleanName, rounding);
+      
       const paramIndex = this._parameters.findIndex(
-        (p) => p.name === parameterName,
+        (p) => p.name === parameterName || this._stripHTML(p.name) === parameterName
       );
+      
       if (paramIndex !== -1) {
         const currentValue = this._parameters[paramIndex].value;
-        const roundedValue = this._roundValue(currentValue, parameterName);
+        const roundedValue = this._roundValue(currentValue, this._parameters[paramIndex].name);
         if (roundedValue !== currentValue) {
-          this.setValue(parameterName, roundedValue);
+          this.setValue(this._parameters[paramIndex].name, roundedValue);
         }
       }
     }
   }
+  
   removeRounding(parameterName) {
-    this._rounding.delete(parameterName);
+    const cleanName = this._stripHTML(parameterName);
+    this._rounding.delete(cleanName);
   }
+  
   setDefaultRounding(rounding) {
     if (rounding > 0) {
       this._defaultRounding = rounding;
       this._parameters.forEach((param, index) => {
-        if (!this._rounding.has(param.name)) {
+        const cleanName = this._stripHTML(param.name);
+        if (!this._rounding.has(cleanName)) {
           const roundedValue = this._roundValue(param.value, param.name);
           if (roundedValue !== param.value) {
             this.setValue(param.name, roundedValue);
@@ -5213,30 +5544,38 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
       });
     }
   }
+  
   setDecimalSeparator(separator) {
     if (separator === "," || separator === ".") {
       this._decimalSeparator = separator;
       this._populateTable();
     }
   }
+  
   setFont(font) {
     this._font = font;
     this._applyStyles();
   }
+  
   setFontSize(fontSize) {
     this._fontSize = fontSize;
     this._applyStyles();
   }
+  
   setTextColor(textColor) {
     this._textColor = textColor;
     this._cssTextColor = this._hexToCSS(textColor);
     this._applyStyles();
   }
+  
   addParameter(name, value = 0) {
-    if (this._parameters.find((p) => p.name === name)) {
+    // Prüfe ob der bereinigte Name bereits existiert
+    const cleanName = this._stripHTML(name);
+    if (this._parameters.find((p) => this._stripHTML(p.name) === cleanName)) {
       console.warn('Parameter "' + name + '" already exists');
       return;
     }
+    
     const roundedValue = this._roundValue(value, name);
     this._parameters.push({ name: name, value: roundedValue });
     this._createParameterRow(
@@ -5244,38 +5583,52 @@ HtmlSvgEdu.ParameterTable = class ParameterTable extends HtmlSvgEdu.Component {
       this._parameters.length - 1,
     );
   }
+  
   removeParameter(name) {
-    const index = this._parameters.findIndex((p) => p.name === name);
+    // Unterstütze sowohl den Original-Namen als auch den bereinigten Namen
+    const index = this._parameters.findIndex(
+      (p) => p.name === name || this._stripHTML(p.name) === name
+    );
+    
     if (index !== -1) {
+      const cleanName = this._stripHTML(this._parameters[index].name);
       this._parameters.splice(index, 1);
-      this._valueLimits.delete(name);
-      this._rounding.delete(name);
+      this._valueLimits.delete(cleanName);
+      this._rounding.delete(cleanName);
       this._populateTable();
     }
   }
+  
   getAllParameters() {
     return this._parameters.map((p) => ({ name: p.name, value: p.value }));
   }
+  
   onChange(callback) {
     if (this._element) {
       this._element.addEventListener("parameter-change", callback);
     }
   }
+  
   get parameters() {
     return this._parameters;
   }
+  
   get title() {
     return this._title;
   }
+  
   get decimalSeparator() {
     return this._decimalSeparator;
   }
+  
   get defaultRounding() {
     return this._defaultRounding;
   }
+  
   getRounding(parameterName) {
-    return this._rounding.has(parameterName)
-      ? this._rounding.get(parameterName)
+    const cleanName = this._stripHTML(parameterName);
+    return this._rounding.has(cleanName)
+      ? this._rounding.get(cleanName)
       : this._defaultRounding;
   }
 };
