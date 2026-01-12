@@ -1,6 +1,6 @@
 /**
  * PixiJSEdu - Educational Animation Library
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: Sebastian Rikowski
  * License: GNU GPLv3
  *
@@ -342,12 +342,11 @@ PixiJSEdu.Group = class Group extends PIXI.Container {
   }
 
   set visible(value) {
-    this._visible = Boolean(value);
-    super.visible = this._visible;
+    super.visible = Boolean(value);
   }
 
   get visible() {
-    return this._visible;
+    return super.visible;
   }
 
   setMask(x, y, width, height) {
@@ -2497,12 +2496,12 @@ PixiJSEdu.LinePath = class LinePath extends PIXI.Container {
     this._rebuildSegments();
   }
 
-  set visible(isVisible) {
-    this.alpha = isVisible ? 1 : 0;
+  set visible(value) {
+    super.visible = Boolean(value);
   }
 
   get visible() {
-    return this.alpha === 1;
+    return super.visible;
   }
 
   destroy(options) {
@@ -2977,11 +2976,12 @@ PixiJSEdu.BezierPath = class BezierPath extends PIXI.Container {
     this._thickness = thickness;
     this._redrawAll();
   }
-  set visible(isVisible) {
-    this.alpha = isVisible ? 1 : 0;
+  set visible(value) {
+    super.visible = Boolean(value);
   }
+
   get visible() {
-    return this.alpha === 1;
+    return super.visible;
   }
 
   destroy(options) {
@@ -3418,11 +3418,10 @@ PixiJSEdu.SplinePath = class SplinePath extends PIXI.Container {
     return this._y;
   }
   set visible(value) {
-    this._visible = value;
-    this.alpha = this._visible ? this._alpha : 0;
+    super.visible = Boolean(value);
   }
   get visible() {
-    return this._visible;
+    return super.visible;
   }
   markAt(x, color = null, radius = null) {
     this.markedX = x;
@@ -4275,13 +4274,10 @@ PixiJSEdu.Arrow = class Arrow extends PIXI.Container {
     return this;
   }
   set visible(value) {
-    this._visible = value;
-    // Verwende die native PIXI.Container visible-Eigenschaft
-    super.visible = value;
-    this.interactive = value;
+    super.visible = Boolean(value);
   }
   get visible() {
-    return this._visible;
+    return super.visible;
   }
   set alpha(value) {
     this._alpha = Math.max(0, Math.min(1, value));
@@ -4763,16 +4759,11 @@ PixiJSEdu.Parallelogram = class Parallelogram extends PIXI.Container {
   }
 
   set visible(value) {
-    this._visible = value;
-    // Setze die PIXI Container visible Eigenschaft
-    super.visible = value;
-    // Zeichne neu
-    this._draw();
-    this.interactive = value;
+    super.visible = Boolean(value);
   }
 
   get visible() {
-    return this._visible;
+    return super.visible;
   }
 
   set alpha(value) {
@@ -5254,14 +5245,11 @@ PixiJSEdu.PointLabel = class PointLabel extends PIXI.Container {
   }
 
   set visible(value) {
-    this._visible = value;
-    // Verwende die native PIXI.Container visible Eigenschaft
-    super.visible = value;
-    this.interactive = value;
+    super.visible = Boolean(value);
   }
 
   get visible() {
-    return this._visible;
+    return super.visible;
   }
 
   set alpha(value) {
@@ -5771,14 +5759,11 @@ PixiJSEdu.LineLabel = class LineLabel extends PIXI.Container {
   }
 
   set visible(value) {
-    this._visible = value;
-    // Verwende die native PIXI.Container visible Eigenschaft
-    super.visible = value;
-    this.interactive = value;
+    super.visible = Boolean(value);
   }
 
   get visible() {
-    return this._visible;
+    return super.visible;
   }
 
   set alpha(value) {
@@ -6202,13 +6187,10 @@ PixiJSEdu.AngleLabel = class AngleLabel extends PIXI.Container {
     return this;
   }
   set visible(value) {
-    this._visible = value;
-    this.alpha = value ? this._alpha : 0;
-    this.interactive = value;
-    return this;
+    super.visible = Boolean(value);
   }
   get visible() {
-    return this._visible;
+    return super.visible;
   }
   set alpha(value) {
     this._alpha = Math.max(0, Math.min(1, value));
@@ -6463,14 +6445,10 @@ PixiJSEdu.Line = class Line extends PIXI.Container {
     return this;
   }
   set visible(value) {
-    this._visible = value;
-    super.visible = value;
-    if (value) {
-      this._draw();
-    }
+    super.visible = Boolean(value);
   }
   get visible() {
-    return this._visible;
+    return super.visible;
   }
   set alpha(value) {
     this._alpha = Math.max(0, Math.min(1, value));
@@ -6681,10 +6659,10 @@ PixiJSEdu.Ruler = class Ruler extends PIXI.Container {
     }
   }
   set visible(value) {
-    this.alpha = value ? 1 : 0;
+    super.visible = Boolean(value);
   }
   get visible() {
-    return this.alpha === 1;
+    return super.visible;
   }
   _draw() {
     this._ticksContainer.removeChildren();
@@ -6982,10 +6960,10 @@ PixiJSEdu.CoordinateSystem = class CoordinateSystem extends PIXI.Container {
     Board[INSTANCE_KEY].addChild(this);
   }
   set visible(value) {
-    this.alpha = value ? 1 : 0;
+    super.visible = Boolean(value);
   }
   get visible() {
-    return this.alpha === 1;
+    return super.visible;
   }
   _draw() {
     if (this._arrows.top) this.removeChild(this._arrows.top);
