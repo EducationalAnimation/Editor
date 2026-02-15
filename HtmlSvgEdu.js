@@ -4403,12 +4403,26 @@ HtmlSvgEdu.Text = class Text extends HtmlSvgEdu.Component {
     this._calculateSvgSize();
     this._addStyles();
     this._createTextElements();
+    this._applyAlignmentTransform();
     this._container.appendChild(this._svgElement);
     this._element = this._container;
   }
   _hexToCSS(hexColor) {
     const hex = hexColor.toString(16).padStart(6, "0");
     return "#" + hex;
+  }
+  _applyAlignmentTransform() {
+    switch (this._textAlign) {
+      case "center":
+        this._container.style.transform = "translateX(-50%)";
+        break;
+      case "right":
+        this._container.style.transform = "translateX(-100%)";
+        break;
+      default:
+        this._container.style.transform = "";
+        break;
+    }
   }
   _parseHtmlTags(text) {
     const parts = [];
@@ -4661,9 +4675,11 @@ HtmlSvgEdu.Text = class Text extends HtmlSvgEdu.Component {
       this._calculateSvgSize();
       this._updateStyles();
       this._createTextElements();
+      this._applyAlignmentTransform();
     }
   }
 };
+
 HtmlSvgEdu.Preloader = class Preloader extends HtmlSvgEdu.Component {
   static serializationMap = {
     description: {
