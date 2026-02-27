@@ -602,10 +602,10 @@ PixiJSEdu.Rectangle = class Rectangle extends PIXI.Container {
       },
       setGradient: {
         example:
-          'setGradient("linear", [{offset:0,color:"#ff0"},{offset:1,color:"#f00"}])',
+          'setGradient("linear", [{offset:0,color:"#ff0"},{offset:1,color:"#f00"}], 90)',
         info: {
-          en: "Creates a linear or radial gradient",
-          de: "Erstellt einen linearen oder radialen Farbverlauf",
+          en: "Creates a linear or radial gradient. Optional angle in degrees for linear gradients (0 = left to right, 90 = top to bottom)",
+          de: "Erstellt einen linearen oder radialen Farbverlauf. Optionaler Winkel in Grad für lineare Verläufe (0 = links nach rechts, 90 = oben nach unten)",
         },
       },
       setScale: {
@@ -792,7 +792,20 @@ PixiJSEdu.Rectangle = class Rectangle extends PIXI.Container {
         const r = Math.max(this._width, this._height) / 2;
         gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
       } else {
-        gradient = ctx.createLinearGradient(0, 0, this._width, 0);
+        // Linear gradient with angle support
+        const angleRad = ((this._gradientAngle || 0) * Math.PI) / 180;
+        const cx = this._width / 2;
+        const cy = this._height / 2;
+        // Calculate the gradient line length to cover the entire rectangle
+        const diagLength =
+          Math.abs(this._width * Math.cos(angleRad)) +
+          Math.abs(this._height * Math.sin(angleRad));
+        const halfDiag = diagLength / 2;
+        const x0 = cx - halfDiag * Math.cos(angleRad);
+        const y0 = cy - halfDiag * Math.sin(angleRad);
+        const x1 = cx + halfDiag * Math.cos(angleRad);
+        const y1 = cy + halfDiag * Math.sin(angleRad);
+        gradient = ctx.createLinearGradient(x0, y0, x1, y1);
       }
       this._gradientStops.forEach((stop) => {
         gradient.addColorStop(stop.offset, stop.color);
@@ -905,14 +918,12 @@ PixiJSEdu.Rectangle = class Rectangle extends PIXI.Container {
   }
 
   _updatePosition() {
-    // Should consider both pivots
     super.x = this._visualX + this._rotationPivotX - this._pivotX;
     super.y = this._visualY + this._rotationPivotY - this._pivotY;
   }
 
   _updateRotationPivot() {
     this.pivot.set(this._rotationPivotX, this._rotationPivotY);
-    // Position must also be updated when pivot changes
     this._updatePosition();
   }
 
@@ -977,9 +988,11 @@ PixiJSEdu.Rectangle = class Rectangle extends PIXI.Container {
       { offset: 0, color: "#fff" },
       { offset: 1, color: "#000" },
     ],
+    angle = 0,
   ) {
     this._gradientType = type;
     this._gradientStops = colorStops;
+    this._gradientAngle = angle;
     this._draw();
   }
 
@@ -1018,9 +1031,7 @@ PixiJSEdu.Rectangle = class Rectangle extends PIXI.Container {
     this._draw();
   }
 
-  // Destroy method extension
   destroy() {
-    // Remove all event handlers
     if (this._clickHandler) {
       this.off("pointerdown", this._clickHandler);
     }
@@ -1037,7 +1048,6 @@ PixiJSEdu.Rectangle = class Rectangle extends PIXI.Container {
       this.off("pointerout", this._mouseOutHandler);
     }
 
-    // Existing destroy logic
     if (this.gradientSprite) {
       this.gradientSprite.destroy();
     }
