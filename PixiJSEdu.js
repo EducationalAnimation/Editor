@@ -6103,24 +6103,31 @@ PixiJSEdu.AngleLabel = class AngleLabel extends PIXI.Container {
     const dotProduct = v1x * v2x + v1y * v2y;
     return Math.abs(dotProduct) < 0.001;
   }
-  _draw() {
+_draw() {
     this.arcGraphics.clear();
     const { startAngle, endAngle, angleDiff } = this._calculateAngles();
-    this.arcGraphics.lineStyle(
-      this._lineThickness,
-      this._lineColor,
-      this._alpha,
-    );
-    this.arcGraphics.beginFill(0x000000, 0);
-    this.arcGraphics.arc(
-      this._centerX,
-      this._centerY,
-      this._radius,
-      startAngle,
-      endAngle,
-      false,
-    );
-    this.arcGraphics.endFill();
+
+    // Bogen nur zeichnen wenn lineThickness > 0
+    if (this._lineThickness > 0) {
+      this.arcGraphics.lineStyle(
+        this._lineThickness,
+        this._lineColor,
+        this._alpha,
+      );
+      this.arcGraphics.beginFill(0x000000, 0);
+      this.arcGraphics.arc(
+        this._centerX,
+        this._centerY,
+        this._radius,
+        startAngle,
+        endAngle,
+        false,
+      );
+      this.arcGraphics.endFill();
+    }
+
+    this.arcGraphics.alpha = this._alpha;
+
     let midAngle = startAngle + angleDiff / 2;
     while (midAngle > 2 * Math.PI) midAngle -= 2 * Math.PI;
     while (midAngle < 0) midAngle += 2 * Math.PI;
@@ -6134,7 +6141,6 @@ PixiJSEdu.AngleLabel = class AngleLabel extends PIXI.Container {
       this._centerY + Math.sin(midAngle) * (this._radius * radiusFactor);
     this.textObject.x = textX;
     this.textObject.y = textY;
-    this.arcGraphics.alpha = this._alpha;
     this.textObject.alpha = this._alpha;
   }
   setText(text) {
