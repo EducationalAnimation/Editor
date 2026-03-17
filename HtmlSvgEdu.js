@@ -1637,7 +1637,7 @@ HtmlSvgEdu.NumericStepper = class NumericStepper extends HtmlSvgEdu.Component {
           de: "Fügt einen Event-Listener für Wertänderungen hinzu",
         },
         example:
-          "onChange(handleChange);\n\nfunction handleChange(event) {  console.log(event.newValue); }",
+          "onChange(handleChange);\n\nfunction handleChange(event) {  console.log(event.value); }",
       },
     },
   };
@@ -1657,7 +1657,7 @@ HtmlSvgEdu.NumericStepper = class NumericStepper extends HtmlSvgEdu.Component {
     this._initialHoldDelay = 500;
     this._holdRepeatRate = 100;
     this._decimals = this._calculateDecimals(this._step);
-    this._oldValue = this._value; // Speichern des alten Wertes für Events
+    this._oldValue = this._value;
     this._container = this._createElement("div");
     this._container.className = "pixi-html-ui pixi-numeric-stepper";
     this._input = document.createElement("input");
@@ -1770,7 +1770,7 @@ HtmlSvgEdu.NumericStepper = class NumericStepper extends HtmlSvgEdu.Component {
   }
   _performStepAction(direction) {
     const currentValue = this._parseValue(this._input.value);
-    this._oldValue = this._value; // Alten Wert speichern
+    this._oldValue = this._value;
     if (direction === 1) {
       this._value = this._roundValue(currentValue + this._step);
     } else if (direction === -1) {
@@ -1786,18 +1786,18 @@ HtmlSvgEdu.NumericStepper = class NumericStepper extends HtmlSvgEdu.Component {
         component: this,
         value: this._value,
         oldValue: this._oldValue,
-        newValue: this._value, // Für Kompatibilität mit der Dokumentation
+        newValue: this._value,
       },
     });
-    // Erweitern des Events um die Properties für direkten Zugriff
+    event.value = this._value;
     event.oldValue = this._oldValue;
-    event.newValue = this._value;
+    event.newValue = this._value; // Rückwärtskompatibilität
     this._element.dispatchEvent(event);
   }
   _setupEvents() {
     this._input.addEventListener("change", (e) => {
       const parsedValue = this._parseValue(this._input.value);
-      this._oldValue = this._value; // Alten Wert speichern
+      this._oldValue = this._value;
       this._value = this._roundValue(parsedValue);
       this._validateValue();
       this._triggerChangeEvent();
@@ -1865,7 +1865,7 @@ HtmlSvgEdu.NumericStepper = class NumericStepper extends HtmlSvgEdu.Component {
     }
   }
   setValue(value) {
-    this._oldValue = this._value; // Alten Wert speichern
+    this._oldValue = this._value;
     this._value = this._roundValue(Number(value));
     this._validateValue();
     this._triggerChangeEvent();
