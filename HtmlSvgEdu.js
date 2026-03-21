@@ -1795,13 +1795,18 @@ HtmlSvgEdu.NumericStepper = class NumericStepper extends HtmlSvgEdu.Component {
     this._element.dispatchEvent(event);
   }
   _setupEvents() {
-    this._input.addEventListener("change", (e) => {
-      const parsedValue = this._parseValue(this._input.value);
-      this._oldValue = this._value;
-      this._value = this._roundValue(parsedValue);
-      this._validateValue();
-      this._triggerChangeEvent();
-    });
+	this._input.addEventListener("change", (e) => {
+		const parsedValue = this._parseValue(this._input.value);
+		this._oldValue = this._value;
+		if (isNaN(parsedValue)) {
+			// Bei ungültiger Eingabe: alten Wert wiederherstellen
+			this._input.value = this._formatValue(this._value);
+			return;
+		}
+		this._value = this._roundValue(parsedValue);
+		this._validateValue();
+		this._triggerChangeEvent();
+	});
     this._input.addEventListener("input", (e) => {
       const allowedChars = new RegExp(
         "^-?\\d*\\" + this._decimalSeparator + "?\\d*$",
